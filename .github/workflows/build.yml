@@ -1,0 +1,67 @@
+name: Build APK
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Find the Android project folder
+        id: find
+        shell: bash
+        run: |
+          dir=""
+          while IFS= read -r f; do
+            d=$(dirname "$f")
+            if [ -f "$d/build.gradle.kts" ] && [ -f "$d/app/build.gradle.kts" ]; then
+              dir="$d"
+              break
+            fi
+          done < <(find . -name settings.gradle.kts -not -path './.git/*' | sort)
+          if [ -z "$dir" ]; then
+            echo "::error::No Android project found (a folder with settings.gradle.kts, build.gradle.kts and app/build.gradle.kts)."
+            echo "Repository files:"
+            find . -maxdepth 3 -not -path './.git/*' | sort | head -80
+            exit 1
+          fi
+          echo "Android project folder: $dir"
+          echo "dir=$dir" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: 8.9
+
+      - name: Build debug APK
+        working-directory: ${{ steps.find.outputs.dir }}
+        run: gradle assembleDebug --stacktrace --no-daemon
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: SolMacro-apk
+          path: ${{ steps.find.outputs.dir }}/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
+      - name: Upload build reports (only when the build fails)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-reports
+          path: |
+            ${{ steps.find.outputs.dir }}/app/build/reports
+            ${{ steps.find.outputs.dir }}/app/build/outputs/logs
+          if-no-files-found: ignore

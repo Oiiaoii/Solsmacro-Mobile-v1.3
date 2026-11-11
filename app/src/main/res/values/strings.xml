@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Sol Macro</string>
+    <string name="svc_desc">Performs the screen taps you set up (fishing and selling) while Roblox is open, and can look at the screen on your device to find the reeling bar. It shows a floating button that opens the Brry control panel, and sends a Discord webhook message only if you add a webhook URL.</string>
+</resources>
